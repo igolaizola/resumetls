@@ -5,13 +5,12 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"io"
-	"io/ioutil"
 	"net"
 	"reflect"
 
-	intio "github.com/igarciaolaizola/resume-tls/internal/io"
-	intnet "github.com/igarciaolaizola/resume-tls/internal/net"
-	intref "github.com/igarciaolaizola/resume-tls/internal/reflect"
+	intio "github.com/igolaizola/resume-tls/internal/io"
+	intnet "github.com/igolaizola/resume-tls/internal/net"
+	intref "github.com/igolaizola/resume-tls/internal/reflect"
 )
 
 // State is buffered handshake data
@@ -32,16 +31,40 @@ type Conn struct {
 	*tls.Conn
 }
 
-// Client returs a resumable tls conn
+// Client returns a resumable tls client conn
 func Client(conn net.Conn, cfg *tls.Config, state *State) (*Conn, error) {
-	if state != nil {
-		return clientResume(conn, cfg, state)
-	}
-	return clientInitialize(conn, cfg), nil
+	return newConn(tls.Client, conn, cfg, state)
 }
 
-// client initializes a resumable TLS client conn
-func clientInitialize(conn net.Conn, cfg *tls.Config) *Conn {
+// Server returns a resumable tls server conn
+func Server(conn net.Conn, cfg *tls.Config, state *State) (*Conn, error) {
+	return newConn(tls.Server, conn, cfg, state)
+}
+
+// newConn returns a resumable tls conn
+func newConn(tlsConn func(net.Conn, *tls.Config) *tls.Conn, conn net.Conn, cfg *tls.Config, state *State) (*Conn, error) {
+	if state != nil {
+		var err error
+		// Client hello message sometimes consumes more random bytes than the
+		// ones provided by the state. Probably due to how elliptic curves keys
+		// are generated.
+		// We have tested empirically that retrying 10 times is enough to get a
+		// successful handshake. Here, we set the limit to 20 to be on the safe
+		// side.
+		for i := 0; i < 20; i++ {
+			var c *Conn
+			c, err = resume(tlsConn, conn, cfg, state)
+			if err == nil {
+				return c, err
+			}
+		}
+		return nil, err
+	}
+	return initialize(tlsConn, conn, cfg), nil
+}
+
+// initializes a resumable TLS client conn
+func initialize(tlsConn func(net.Conn, *tls.Config) *tls.Conn, conn net.Conn, cfg *tls.Config) *Conn {
 	connBuf := &bytes.Buffer{}
 	randBuf := &bytes.Buffer{}
 
@@ -64,12 +87,12 @@ func clientInitialize(conn net.Conn, cfg *tls.Config) *Conn {
 		overrideRand: ovRand,
 		connBuffer:   connBuf,
 		randBuffer:   randBuf,
-		Conn:         tls.Client(ovConn, cfg),
+		Conn:         tlsConn(ovConn, cfg),
 	}
 }
 
-// clientResume resumes a resumable TLS client conn
-func clientResume(conn net.Conn, cfg *tls.Config, state *State) (*Conn, error) {
+// resume resumes a resumable TLS client conn
+func resume(tlsConn func(net.Conn, *tls.Config) *tls.Conn, conn net.Conn, cfg *tls.Config, state *State) (*Conn, error) {
 	rnd := cfg.Rand
 	if rnd == nil {
 		rnd = rand.Reader
@@ -81,24 +104,24 @@ func clientResume(conn net.Conn, cfg *tls.Config, state *State) (*Conn, error) {
 	ovConn := &intnet.OverrideConn{
 		Conn:           conn,
 		OverrideReader: io.MultiReader(bytes.NewBuffer(state.conn), conn),
-		OverrideWriter: ioutil.Discard,
+		OverrideWriter: io.Discard,
 	}
 	cfg.Rand = ovRand
 
-	cli := tls.Client(ovConn, cfg)
-	if err := cli.Handshake(); err != nil {
+	c := tlsConn(ovConn, cfg)
+	if err := c.Handshake(); err != nil {
 		return nil, err
 	}
 	ovRand.OverrideReader = nil
 	ovConn.OverrideReader = nil
 	ovConn.OverrideWriter = nil
-	setSeq(cli, state.inSeq, state.outSeq)
+	setSeq(c, state.inSeq, state.outSeq)
 
 	return &Conn{
 		handshaked: true,
 		connBuffer: bytes.NewBuffer(state.conn),
 		randBuffer: bytes.NewBuffer(state.rand),
-		Conn:       cli,
+		Conn:       c,
 	}, nil
 }
 

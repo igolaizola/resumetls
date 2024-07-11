@@ -56,6 +56,12 @@ fi06KUiLh/4rJtf2wph2wN8SPAY4yQkopFlDYTJNmhhYsKTGIhrpww==
 -----END RSA PRIVATE KEY-----`
 
 func TestClient(t *testing.T) {
+	for i := 0; i < 100; i++ {
+		testClient(t)
+	}
+}
+
+func testClient(t *testing.T) {
 	sConn, cConn := net.Pipe()
 
 	pair, err := tls.X509KeyPair([]byte(cert), []byte(key))
@@ -77,18 +83,18 @@ func TestClient(t *testing.T) {
 	// Launch server in another goroutine
 	go func() {
 		if err := srv.Handshake(); err != nil {
-			t.Fatal(err)
+			panic(err)
 		}
 		// Loop of read write
 		for i := 0; i < 2; i++ {
 			recv := make([]byte, 1024)
 			n, err := srv.Read(recv)
 			if err != nil {
-				t.Fatal(err)
+				panic(err)
 			}
 
 			if _, err := srv.Write(recv[:n]); err != nil {
-				t.Fatal(err)
+				panic(err)
 			}
 		}
 	}()
@@ -132,6 +138,100 @@ func TestClient(t *testing.T) {
 
 	recv = make([]byte, 1024)
 	n, err = cli2.Read(recv)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !bytes.Equal(message, recv[:n]) {
+		t.Errorf("messages missmatch: %s != %s", message, recv[:n])
+	}
+}
+
+func TestServer(t *testing.T) {
+	for i := 0; i < 100; i++ {
+		testServer(t)
+	}
+}
+
+func testServer(t *testing.T) {
+	sConn, cConn := net.Pipe()
+
+	pair, err := tls.X509KeyPair([]byte(cert), []byte(key))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cli := tls.Client(sConn, &tls.Config{
+		InsecureSkipVerify: true,
+	})
+
+	srv, err := Server(cConn, &tls.Config{
+		InsecureSkipVerify: true,
+		Certificates:       []tls.Certificate{pair},
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Launch client in another goroutine
+	go func() {
+		if err := cli.Handshake(); err != nil {
+			panic(err)
+		}
+		// Loop of read write
+		for i := 0; i < 2; i++ {
+			recv := make([]byte, 1024)
+			n, err := cli.Read(recv)
+			if err != nil {
+				panic(err)
+			}
+
+			if _, err := cli.Write(recv[:n]); err != nil {
+				panic(err)
+			}
+		}
+	}()
+
+	// Initial handshake
+	if err := srv.Handshake(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Test write and read
+	message := []byte("Hello")
+	if _, err := srv.Write(message); err != nil {
+		t.Fatal(err)
+	}
+
+	recv := make([]byte, 1024)
+	n, err := srv.Read(recv)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !bytes.Equal(message, recv[:n]) {
+		t.Errorf("messages missmatch: %s != %s", message, recv[:n])
+	}
+
+	// Extract TLS state
+	state := srv.State()
+
+	// Resume server
+	srv2, err := Server(cConn, &tls.Config{
+		InsecureSkipVerify: true,
+		Certificates:       []tls.Certificate{pair},
+	}, state)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Test write and read on resumed client
+	if _, err := srv2.Write(message); err != nil {
+		t.Fatal(err)
+	}
+
+	recv = make([]byte, 1024)
+	n, err = srv.Read(recv)
 	if err != nil {
 		t.Fatal(err)
 	}
