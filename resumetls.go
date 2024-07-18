@@ -8,9 +8,9 @@ import (
 	"net"
 	"reflect"
 
-	intio "github.com/igolaizola/resume-tls/internal/io"
-	intnet "github.com/igolaizola/resume-tls/internal/net"
-	intref "github.com/igolaizola/resume-tls/internal/reflect"
+	intio "github.com/igolaizola/resumetls/internal/io"
+	intnet "github.com/igolaizola/resumetls/internal/net"
+	intref "github.com/igolaizola/resumetls/internal/reflect"
 )
 
 // State is buffered handshake data

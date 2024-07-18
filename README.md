@@ -1,4 +1,4 @@
-# resume-tls
+# resumetls
 
 Resumable TLS client connection without doing any additional handshake operations, implemented in golang
 

@@ -1,3 +1,3 @@
-module github.com/igolaizola/resume-tls
+module github.com/igolaizola/resumetls
 
 go 1.22.2
