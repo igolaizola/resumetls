@@ -55,13 +55,123 @@ WVTd3XNizIpuNpDgGI4qvIwmEs7UhAzemxasYoP3y3FO2dT0QGC+T1SX/BsW6AiO
 fi06KUiLh/4rJtf2wph2wN8SPAY4yQkopFlDYTJNmhhYsKTGIhrpww==
 -----END RSA PRIVATE KEY-----`
 
+var ciphers = []struct {
+	name   string
+	cipher uint16
+}{
+	{
+		name:   "TLS_RSA_WITH_RC4_128_SHA",
+		cipher: tls.TLS_RSA_WITH_RC4_128_SHA,
+	},
+	{
+		name:   "TLS_RSA_WITH_3DES_EDE_CBC_SHA",
+		cipher: tls.TLS_RSA_WITH_3DES_EDE_CBC_SHA,
+	},
+	{
+		name:   "TLS_RSA_WITH_AES_128_CBC_SHA",
+		cipher: tls.TLS_RSA_WITH_AES_128_CBC_SHA,
+	},
+	{
+		name:   "TLS_RSA_WITH_AES_256_CBC_SHA",
+		cipher: tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+	},
+	{
+		name:   "TLS_RSA_WITH_AES_128_CBC_SHA256",
+		cipher: tls.TLS_RSA_WITH_AES_128_CBC_SHA256,
+	},
+	{
+		name:   "TLS_RSA_WITH_AES_128_GCM_SHA256",
+		cipher: tls.TLS_RSA_WITH_AES_128_GCM_SHA256,
+	},
+	{
+		name:   "TLS_RSA_WITH_AES_256_GCM_SHA384",
+		cipher: tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+	},
+	{
+		name:   "TLS_ECDHE_ECDSA_WITH_RC4_128_SHA",
+		cipher: tls.TLS_ECDHE_ECDSA_WITH_RC4_128_SHA,
+	},
+	{
+		name:   "TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA",
+		cipher: tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
+	},
+	{
+		name:   "TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA",
+		cipher: tls.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
+	},
+	{
+		name:   "TLS_ECDHE_RSA_WITH_RC4_128_SHA",
+		cipher: tls.TLS_ECDHE_RSA_WITH_RC4_128_SHA,
+	},
+	{
+		name:   "TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA",
+		cipher: tls.TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA,
+	},
+	{
+		name:   "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA",
+		cipher: tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
+	},
+	{
+		name:   "TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA",
+		cipher: tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+	},
+	{
+		name:   "TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256",
+		cipher: tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,
+	},
+	{
+		name:   "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256",
+		cipher: tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256,
+	},
+	{
+		name:   "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+		cipher: tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+	},
+	{
+		name:   "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
+		cipher: tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+	},
+	{
+		name:   "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
+		cipher: tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+	},
+	{
+		name:   "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384",
+		cipher: tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+	},
+	{
+		name:   "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256",
+		cipher: tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
+	},
+	{
+		name:   "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256",
+		cipher: tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
+	},
+	{
+		name:   "TLS_AES_128_GCM_SHA256",
+		cipher: tls.TLS_AES_128_GCM_SHA256,
+	},
+	{
+		name:   "TLS_AES_256_GCM_SHA384",
+		cipher: tls.TLS_AES_256_GCM_SHA384,
+	},
+	{
+		name:   "TLS_CHACHA20_POLY1305_SHA256",
+		cipher: tls.TLS_CHACHA20_POLY1305_SHA256,
+	},
+}
+
 func TestClient(t *testing.T) {
-	for i := 0; i < 100; i++ {
-		testClient(t)
+	for _, tt := range ciphers {
+		t.Run(tt.name, func(t *testing.T) {
+			for i := 0; i < 100; i++ {
+				testClient(t, tt.cipher)
+			}
+		})
 	}
 }
 
-func testClient(t *testing.T) {
+func testClient(t *testing.T, cipher uint16) {
 	sConn, cConn := net.Pipe()
 
 	pair, err := tls.X509KeyPair([]byte(cert), []byte(key))
@@ -71,10 +181,12 @@ func testClient(t *testing.T) {
 
 	srv := tls.Server(sConn, &tls.Config{
 		Certificates: []tls.Certificate{pair},
+		CipherSuites: []uint16{cipher},
 	})
 
 	cli, err := Client(cConn, &tls.Config{
 		InsecureSkipVerify: true,
+		CipherSuites:       []uint16{cipher},
 	}, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -148,12 +260,16 @@ func testClient(t *testing.T) {
 }
 
 func TestServer(t *testing.T) {
-	for i := 0; i < 100; i++ {
-		testServer(t)
+	for _, tt := range ciphers {
+		t.Run(tt.name, func(t *testing.T) {
+			for i := 0; i < 100; i++ {
+				testServer(t, tt.cipher)
+			}
+		})
 	}
 }
 
-func testServer(t *testing.T) {
+func testServer(t *testing.T, cipher uint16) {
 	sConn, cConn := net.Pipe()
 
 	pair, err := tls.X509KeyPair([]byte(cert), []byte(key))
@@ -163,11 +279,13 @@ func testServer(t *testing.T) {
 
 	cli := tls.Client(sConn, &tls.Config{
 		InsecureSkipVerify: true,
+		CipherSuites:       []uint16{cipher},
 	})
 
 	srv, err := Server(cConn, &tls.Config{
 		InsecureSkipVerify: true,
 		Certificates:       []tls.Certificate{pair},
+		CipherSuites:       []uint16{cipher},
 	}, nil)
 	if err != nil {
 		t.Fatal(err)
