@@ -15,10 +15,11 @@ import (
 
 // State is buffered handshake data
 type State struct {
-	conn   []byte
-	rand   []byte
-	inSeq  [8]byte
-	outSeq [8]byte
+	conn        []byte
+	rand        []byte
+	inSeq       [8]byte
+	outSeq      [8]byte
+	cipherSuite uint16
 }
 
 // Conn resumable tls conn
@@ -119,7 +120,7 @@ func resume(tlsConn func(net.Conn, *tls.Config) *tls.Conn, conn net.Conn, cfg *t
 	ovRand.OverrideReader = nil
 	ovConn.OverrideReader = nil
 	ovConn.OverrideWriter = nil
-	setSeq(c, state.inSeq, state.outSeq)
+	setState(c, state.inSeq, state.outSeq, state.cipherSuite)
 
 	return &Conn{
 		handshaked: true,
@@ -147,33 +148,36 @@ func (c *Conn) Handshake() error {
 
 // State gets the data in order to resume a connection
 func (c *Conn) State() *State {
-	in, out := getSeq(c.Conn)
+	in, out, cipherSuite := getState(c.Conn)
 	return &State{
-		conn:   c.connBuffer.Bytes(),
-		rand:   c.randBuffer.Bytes(),
-		inSeq:  in,
-		outSeq: out,
+		conn:        c.connBuffer.Bytes(),
+		rand:        c.randBuffer.Bytes(),
+		inSeq:       in,
+		outSeq:      out,
+		cipherSuite: cipherSuite,
 	}
 }
 
-// setSeq override sequence number
-func setSeq(conn *tls.Conn, in [8]byte, out [8]byte) {
+// setState override sequence numbers and cipher suite
+func setState(conn *tls.Conn, in [8]byte, out [8]byte, cipherSuite uint16) {
 	r := reflect.ValueOf(conn).Elem()
 	fIn := r.FieldByName("in")
 	fOut := r.FieldByName("out")
 
 	intref.SetFieldValue(fIn, "seq", in)
 	intref.SetFieldValue(fOut, "seq", out)
+	//intref.SetFieldValue(r, "cipherSuite", cipherSuite)
 }
 
-// getSeq obtains sequence numbers
-func getSeq(conn *tls.Conn) ([8]byte, [8]byte) {
+// getState obtains sequence numbers and cipher suite
+func getState(conn *tls.Conn) ([8]byte, [8]byte, uint16) {
 	r := reflect.ValueOf(conn).Elem()
 	fIn := r.FieldByName("in")
 	in := intref.FieldToInterface(fIn, "seq").([8]byte)
 
 	fOut := r.FieldByName("out")
 	out := intref.FieldToInterface(fOut, "seq").([8]byte)
+	cipherSuite := intref.FieldToInterface(r, "cipherSuite").(uint16)
 
-	return in, out
+	return in, out, cipherSuite
 }
