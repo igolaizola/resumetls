@@ -238,6 +238,7 @@ func testClient(t *testing.T, cipher uint16) {
 	// Resume client
 	cli2, err := Client(cConn, &tls.Config{
 		InsecureSkipVerify: true,
+		CipherSuites:       []uint16{cipher},
 	}, state)
 	if err != nil {
 		t.Fatal(err)
@@ -338,6 +339,7 @@ func testServer(t *testing.T, cipher uint16) {
 	srv2, err := Server(cConn, &tls.Config{
 		InsecureSkipVerify: true,
 		Certificates:       []tls.Certificate{pair},
+		CipherSuites:       []uint16{cipher},
 	}, state)
 	if err != nil {
 		t.Fatal(err)
