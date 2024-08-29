@@ -166,7 +166,7 @@ func setState(conn *tls.Conn, in [8]byte, out [8]byte, cipherSuite uint16) {
 
 	intref.SetFieldValue(fIn, "seq", in)
 	intref.SetFieldValue(fOut, "seq", out)
-	//intref.SetFieldValue(r, "cipherSuite", cipherSuite)
+	intref.SetFieldValue(r, "cipherSuite", cipherSuite)
 }
 
 // getState obtains sequence numbers and cipher suite
